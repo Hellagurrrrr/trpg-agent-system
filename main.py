@@ -3,7 +3,10 @@ v0.0 入口：角色创建 → 固定模组「庄园调查案」→ 解析→检
 """
 from __future__ import annotations
 
+import time
+
 from dm_agent import generate_narrative_with_llm
+from llm_client import DM_MODEL, PM_MODEL
 from pm_agent import parse_action_with_llm
 from rules_engine import resolve_check
 from schemas import PlayerAction, RuleResult
@@ -45,6 +48,7 @@ def main() -> None:
     input("\n按回车开始游戏…")
 
     print("\n=== 跑团开始 ===")
+    print(f"LLM 模型：PM={PM_MODEL} · DM={DM_MODEL}")
     print("当前地点：", state["world"]["current_location"])
     print("主线：", state["quests"]["main_quest"]["description"])
 
@@ -64,7 +68,10 @@ def main() -> None:
         )
 
         try:
+            print("\n… 正在解析行动（PM）…", flush=True)
+            t_pm0 = time.perf_counter()
             parsed_action = parse_action_with_llm(player_action, state)
+            pm_elapsed_s = time.perf_counter() - t_pm0
         except Exception as e:
             print(f"\n[PM 解析失败] {e}")
             continue
@@ -77,12 +84,15 @@ def main() -> None:
         state = apply_result(state, parsed_action, rule_result)
 
         try:
+            print("… 正在生成叙事（DM）…", flush=True)
+            t_dm0 = time.perf_counter()
             narrative = generate_narrative_with_llm(
                 user_input=user_input,
                 parsed_action=parsed_action,
                 rule_result=rule_result,
                 state=state,
             )
+            dm_elapsed_s = time.perf_counter() - t_dm0
         except Exception as e:
             print(f"\n[DM 生成失败] {e}")
             continue
@@ -99,6 +109,9 @@ def main() -> None:
                 print(f"{i}. {option}")
 
         print("\n[调试信息]")
+        print(
+            f"本回合耗时：PM {pm_elapsed_s:.2f}s · DM {dm_elapsed_s:.2f}s · 合计 {pm_elapsed_s + dm_elapsed_s:.2f}s"
+        )
         print("解析动作：", parsed_action.model_dump())
         print("判定结果：", rule_result)
         print("当前位置：", state["world"]["current_location"])

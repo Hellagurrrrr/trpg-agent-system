@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from typing import Any, Mapping
 
-from llm_client import chat_json_stream
+from llm_client import DM_MODEL, chat_json_stream
 from schemas import NarrativeResponse, ParsedAction
 
 
@@ -60,6 +60,7 @@ def generate_narrative_with_llm(
     raw = chat_json_stream(
         system_message=DM_SYSTEM_PROMPT,
         user_message=json.dumps(prompt_payload, ensure_ascii=False),
+        model=DM_MODEL,
         stream_label="DM Agent",
     )
     return NarrativeResponse.model_validate(raw)

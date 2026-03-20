@@ -24,7 +24,12 @@ client = OpenAI(
     base_url="https://open.bigmodel.cn/api/paas/v4/"
 )
 
-DEFAULT_MODEL = "glm-4.7"
+# DM：主叙事，默认较强模型；可通过 ZAI_DM_MODEL / ZAI_MODEL 覆盖
+DM_MODEL = os.getenv("ZAI_DM_MODEL") or os.getenv("ZAI_MODEL") or "glm-4.7"
+# PM：结构化解析，默认较快模型；若与控制台名称不一致请设 ZAI_PM_MODEL
+PM_MODEL = os.getenv("ZAI_PM_MODEL") or "glm-4-flash"
+
+DEFAULT_MODEL = DM_MODEL
 
 
 def chat_once(user_message: str, system_message: str = "你是一个有帮助的助手。") -> str:
@@ -66,10 +71,16 @@ def chat_once_stream(
     return "".join(parts)
 
 
-def chat_json(system_message: str, user_message: str) -> dict:
+def chat_json(
+    system_message: str,
+    user_message: str,
+    *,
+    model: Optional[str] = None,
+) -> dict:
     """非流式 JSON；兼容旧调用或流式不可用时回退。"""
+    m = model if model is not None else DM_MODEL
     response = client.chat.completions.create(
-        model=DEFAULT_MODEL,
+        model=m,
         messages=[
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message},
@@ -89,18 +100,21 @@ def chat_json_stream(
     user_message: str,
     *,
     temperature: float = 0,
+    model: Optional[str] = None,
     stream_label: str = "",
     on_chunk: Optional[Callable[[str], None]] = None,
     echo: bool = True,
 ) -> dict:
     """
     流式请求 JSON Object：逐块收取，整段拼齐后 json.loads。
+    - model：默认 DM_MODEL；PM 调用应传入 PM_MODEL。
     - stream_label：非空时先打印一行标题。
     - on_chunk：自定义每块处理；若为空且 echo=True，则默认 print(块, end='', flush=True)。
     """
+    m = model if model is not None else DM_MODEL
     try:
         stream = client.chat.completions.create(
-            model=DEFAULT_MODEL,
+            model=m,
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_message},
@@ -111,8 +125,8 @@ def chat_json_stream(
         )
     except Exception as exc:
         # 少数兼容实现不支持「流式 + json_object」组合，回退为整包请求
-        print(f"[llm] 流式 JSON 不可用（{exc}），已回退为非流式。")
-        return chat_json(system_message, user_message)
+        print(f"[llm] 流式 JSON 不可用（{exc}），model={m}，已回退为非流式。", flush=True)
+        return chat_json(system_message, user_message, model=m)
 
     parts: list[str] = []
     header_printed = False
@@ -134,8 +148,8 @@ def chat_json_stream(
             parts.append(delta)
             _emit(delta)
     except Exception as exc:
-        print(f"\n[llm] 流式读取中断（{exc}），已回退为非流式。")
-        return chat_json(system_message, user_message)
+        print(f"\n[llm] 流式读取中断（{exc}），model={m}，已回退为非流式。", flush=True)
+        return chat_json(system_message, user_message, model=m)
 
     if echo and on_chunk is None and parts:
         print(flush=True)
