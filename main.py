@@ -103,11 +103,6 @@ def main() -> None:
         if narrative.important_notice:
             print("\n提示：", narrative.important_notice)
 
-        if narrative.player_options_hint:
-            print("\n你可以尝试：")
-            for i, option in enumerate(narrative.player_options_hint, start=1):
-                print(f"{i}. {option}")
-
         print("\n[调试信息]")
         print(
             f"本回合耗时：PM {pm_elapsed_s:.2f}s · DM {dm_elapsed_s:.2f}s · 合计 {pm_elapsed_s + dm_elapsed_s:.2f}s"

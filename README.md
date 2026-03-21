@@ -245,668 +245,191 @@ PM agent 会先做拆解：
 
 - 当前目标：进入庄园并寻找账本
 
-# V0.0
+# v0.1 功能目标
 
-v0.0作为启动版本，只包含**最基础的**可运行功能，既：
+v0.1 版本实现一个可连续游玩的单人固定模组 Demo，支持多轮自然语言行动、结构化判定、状态持续更新和基础叙事反馈。
 
-*单人玩家，在固定模组中，通过自然语言进行行动，系统完成一次完整的“解析 → 判定 → 状态更新 → 叙事反馈”的循环。*
+# v0.1 必备功能
 
-## 玩家体验流程：
+## 1. 单人多轮游戏循环
 
-玩家进入游戏后可以：
+这是 v0.1 最核心的升级。
 
-1. 创建角色（简化版）
-2. 进入一个固定剧情场景
-3. 输入一句自然语言行动
-    
-    👉 例如：「我假装送货员混进去」
-    
+v0.0 是：
 
-系统必须做到：
+- 输入一句
+- 系统回复一句
+- 测试闭环结束
 
-- 理解意图（PM）
-- 判断是否需要检定（PM + Rules）
-- 掷骰并计算结果（Rules）
-- 更新世界（World State）
-- 生成叙事反馈（DM）
+v0.1 支持：
 
-👉 然后回到下一轮
+- 玩家连续输入多轮行动
+- 每轮都基于当前世界状态进行处理
+- 游戏不会每轮“失忆”
 
-## 当前版本功能：
+至少支持这样的流程：
 
-只保留“闭环必须的东西”：
+- 玩家进入场景
+- 观察环境
+- 伪装接近
+- 被守卫盘问
+- 试图说服
+- 失败后改成逃跑或战斗
 
----
+## 2. 结构化世界状态管理
 
-### 1️⃣ 世界 & 剧情
-
-- ✅ 只允许 **1个预设模组**
-- ✅ 固定剧情结构：庄园调查案
-- ❌ 不做自由世界生成
-- ❌ 不做多结局复杂分支（可以有简单分支）
-
----
-
-### 2️⃣ 角色系统
-
-- ✅ 4 个属性：力量、敏捷、智力、魅力
-- ✅ 1 个基础状态：生命值
-- ✅ 初始数值固定
-- ❌ 不做复杂技能树
-- ❌ 不做完整装备系统（仅支持简单物品持有）
-
----
-
-### 3️⃣ 行动解析（PM核心）
-
-- ✅ 识别 action_type（潜行/ 说服/ 调查/攻击）
-- ✅ 判断是否需要检定
-- ❌ 不追求100%准确（允许模糊）
-
----
-
-### 4️⃣ 规则系统（Rules Engine）
-
-- ✅ d20
-- ✅ 属性加值
-- ✅ 成功 / 失败 / 临界
-- ❌ 不做复杂战斗系统
-
----
-
-### 5. 世界状态（World State）
-
-- ✅ 记录玩家当前位置
-- ✅ 记录玩家生命值
-- ✅ 记录玩家持有物品
-- ✅ 记录已发现线索
-- ✅ 记录关键 NPC 的基础状态
-- ❌ 不做复杂地图系统
-- ❌ 不做长期关系网络
-
----
-
-### 6. 叙事反馈（DM）
-
-- ✅ 根据世界状态和判定结果生成叙事文本
-- ✅ 体现成功 / 失败的差异
-- ✅ 渲染基本氛围
-- ❌ 不直接修改结构化状态
-- ❌ 不凭空创造关键线索和重大结果
-
-## v0.0 完成标准
-
-当系统能够满足以下条件时，视为 v0.0 完成：
-
-- 玩家可以创建角色并开始游戏
-- 玩家可以在固定模组中连续输入自然语言行动
-- 系统可以稳定完成“解析 → 判定 → 状态更新 → 叙事反馈”闭环
-- 系统可连续运行 10 轮以上且无明显逻辑崩坏
-- 玩家状态、线索、位置等基础信息能够被正确维护
-
-## 未来可实现的功能：
-
-- [ ]  多玩家
-- [ ]  自由世界生成
-- [ ]  完整TRPG规则（如COC全套）
-- [ ]  长期剧情一致性
-- [ ]  NPC复杂人格系统
-- [ ]  战斗系统
-- [ ]  开放地图探索
-- [ ]  UI（只做CLI）
-
-# 技术设计
-
-# 一、V0.0总原则
-
-v0.0 里，系统需遵守这条规则：
-
-> **只有 World State Manager / Rules Engine 有权修改结构化状态。**
-> 
-> - PM 负责解析和调度。
-> - DM 只负责生成面向玩家的叙事文本。
-
-这样做的好处是：
-
-- 不容易出现“LLM 胡乱改状态”
-- 方便 debug
-- 每一步错误都能定位到模块
-
----
-
-# 二、v0.0 总体数据流
-
-若本回合需检定：
-
-```
-玩家输入
-→ PM Agent 解析意图
-→ Rules Engine 判断/执行检定
-→ World State 更新
-→ DM Agent 生成叙事反馈
-→ 返回给玩家
-```
-
-若本回合不需要检定，则变成：
-
-```
-玩家输入
-→ PM Agent 解析意图
-→ 直接生成状态变更建议
-→ World State 更新
-→ DM Agent 生成叙事反馈
-→ 返回给玩家
-```
-
----
-
-# 三、核心对象
-
- v0.0 统一使用 6 个核心结构：
-
-1. `PlayerAction`：玩家原始输入
-2. `ParsedAction`：PM 解析后的动作
-3. `RuleRequest`：发给 Rules 的请求
-4. `RuleResult`：Rules 返回的结果
-5. `WorldState`：当前世界状态
-6. `NarrativeResponse`：最终给玩家看的输出
-
-## 1. 玩家输入：PlayerAction
-
-这是最外层输入，尽量简单。
+至少要有一个最小 state，例如：
 
 ```json
 {
-  "session_id": "session_001",
-  "turn_id": 1,
-  "raw_input": "我想假装成送货员混进庄园",
-  "timestamp": "2026-03-20T20:00:00+08:00"
-}
-```
-
-### 字段说明
-
-- `session_id`：当前游戏会话 ID
-- `turn_id`：第几轮
-- `raw_input`：玩家自然语言输入
-- `timestamp`：时间戳
-
----
-
-## 2. PM 输出：ParsedAction
-
-这是最关键的结构。PM 的任务不是写小说，而是把玩家的话压成结构化动作。
-
-```json
-{
-  "action_type": "deception_infiltration",
-  "intent": "伪装身份进入目标地点",
-  "target": "庄园",
-  "method": "假装送货员",
-  "requires_check": true,
-  "check_type": "charisma",
-  "difficulty": 12,
-  "preconditions": [
-    "玩家当前位于庄园外",
-    "庄园门口有守卫"
-  ],
-  "on_success": [
-    "进入庄园外院"
-  ],
-  "on_failure": [
-    "守卫起疑",
-    "警惕度上升"
-  ],
-  "notes": "允许后续触发调查类行动"
-}
-```
-
-### 字段说明
-
-- `action_type`：动作类型，供程序分流
-- `intent`：动作意图的人类可读总结
-- `target`：目标对象/地点
-- `method`：采用的方法
-- `requires_check`：是否需要检定
-- `check_type`：使用什么属性
-- `difficulty`：难度等级
-- `preconditions`：成立前提
-- `on_success` / `on_failure`：结果建议
-- `notes`：补充说明
-
----
-
-## 3. Rules Engine输入：RuleRequest
-
-PM 不直接掷骰。它只是把需要判定的请求发给 Rules Engine。
-
-```json
-{
-  "turn_id": 1,
-  "actor_id": "player",
-  "action_type": "deception_infiltration",
-  "check_type": "charisma",
-  "difficulty": 12,
-  "player_modifier": 2,
-  "context_tags": ["庄园入口", "门卫在场"]
-}
-```
-
-### 字段说明
-
-- `turn_id`：第几轮
-- `actor_id`：谁执行动作
-- `action_type`：动作类别
-- `check_type`：检定属性
-- `difficulty`：目标难度
-- `player_modifier`：属性修正值
-- `context_tags`：上下文标签，便于记录日志
-
----
-
-## 4. Rules Engine输出：RuleResult
-
-Rules 只负责“算”，不负责“讲”。
-
-```json
-{
-  "turn_id": 1,
-  "roll": 14,
-  "modifier": 2,
-  "total": 16,
-  "difficulty": 12,
-  "outcome": "success",
-  "critical": false,
-  "mechanical_effects": [
-    {
-      "type": "npc_alert_change",
-      "target": "guard",
-      "delta": -1
-    },
-    {
-      "type": "location_unlock",
-      "value": "庄园外院"
-    }
-  ]
-}
-```
-
-### 字段说明
-
-- `turn_id`：第几轮
-- `roll`：骰子原始值
-- `modifier`：修正值
-- `total`：最终结果
-- `difficulty`：难度
-- `outcome`：`success / failure / critical_success / critical_failure`
-- `critical`：是否临界
-- `mechanical_effects`：结构化效果列表
-
----
-
-## 5. 世界状态：WorldState
-
-这是你整个系统的“真相源”。 v0.0 最小版先这样：
-
-```json
-{
-  "session_id": "session_001",
-  "module_id": "manor_mystery_v0",
-  "turn_id": 1,
+  "scene_id": "warehouse_entry",
   "player": {
-    "name": "林舟",
     "hp": 10,
-    "attributes": {
-      "strength": 1,
-      "agility": 2,
-      "intelligence": 2,
-      "charisma": 2
-    },
-    "inventory": [],
-    "status_flags": []
-  },
-  "world": {
-    "current_location": "庄园门口",
-    "time_stage": "傍晚",
-    "discovered_clues": [],
-    "unlocked_locations": ["庄园门口"],
-    "chapter": "chapter_1"
+    "inventory": ["letter", "coin"],
+    "status": ["disguised_as_messenger"]
   },
   "npcs": {
-    "guard": {
-      "state": "值守中",
-      "alert_level": 2,
-      "attitude": "中立"
+    "gate_guard": {
+      "attitude": "suspicious",
+      "alert_level": 1
     }
   },
-  "quests": {
-    "main_quest": {
-      "id": "enter_manor",
-      "description": "进入庄园并寻找账本",
-      "status": "in_progress"
-    }
+  "environment": {
+    "time": "night",
+    "gate_open": false
   },
-  "history": {
-    "recent_turns": [
-      "玩家来到庄园门口"
-    ]
+  "quest": {
+    "target": "enter_warehouse",
+    "progress": "at_gate"
   }
 }
 ```
 
----
+不需要一开始就做得很复杂，但必须满足：
 
-## 6. 状态变更请求：StateUpdate
+- 能读
+- 能改
+- 能被下一轮使用
+- 能被日志记录
 
-为了避免谁都能乱改状态，单独定义一个中间层。
+## 3. 行动解析输出结构化
 
-Rules 和 PM 只提交“变更建议”，由 State Manager 应用。
-
-```json
-{
-  "turn_id": 1,
-  "updates": [
-    {
-      "op": "set",
-      "path": "world.current_location",
-      "value": "庄园外院"
-    },
-    {
-      "op": "add",
-      "path": "world.unlocked_locations",
-      "value": "庄园外院"
-    },
-    {
-      "op": "inc",
-      "path": "npcs.guard.alert_level",
-      "value": -1
-    },
-    {
-      "op": "append",
-      "path": "history.recent_turns",
-      "value": "玩家成功伪装成送货员进入庄园外院"
-    }
-  ]
-}
-```
-
-### 支持的操作类型
-
-- `set`：直接赋值
-- `inc`：数值增减
-- `add`：向集合/列表添加唯一项
-- `append`：追加记录
-
-这样很适合后面写 Python。
-
----
-
-## 7. DM 输入：NarrativeContext
-
-DM 不应该直接拿全部原始状态乱发挥。给它“精选后的上下文”。
+不要再让 PM 只输出一段解释文字。v0.1 应该让 PM 输出标准字段，比如：
 
 ```json
 {
-  "player_action": "我想假装成送货员混进庄园",
-  "parsed_action": {
-    "action_type": "deception_infiltration",
-    "target": "庄园",
-    "method": "假装送货员"
-  },
-  "rule_result": {
-    "outcome": "success",
-    "roll": 14,
-    "total": 16,
-    "difficulty": 12
-  },
-  "visible_world_state": {
-    "current_location": "庄园外院",
-    "nearby_npcs": ["guard"],
-    "nearby_objects": ["木箱", "侧门", "石板路"]
-  },
-  "tone": "悬疑、轻度紧张"
+  "action_type": "social_deception",
+  "target": "gate_guard",
+  "intent": "gain_entry",
+  "approach": "pretend_to_be_messenger",
+  "requires_check": true,
+  "suggested_check": "deception"
 }
 ```
 
----
+这样后面的规则、状态更新、叙事生成才能稳定衔接。
 
-## 8. DM 输出：NarrativeResponse
+## 4. 显式规则判定模块
 
-这是给玩家看的结果，可以把叙事和辅助信息拆开。
+LLM 可以负责“理解玩家想干什么”，但不要负责最终规则裁决。
+
+v0.1 至少要明确：
+
+- 哪些行动需要检定
+- 检定类型是什么
+- 难度怎么定
+- 骰子怎么掷
+- 成功 / 失败 / 大成功 / 大失败如何处理
+
+例如你可以先做一个非常轻量的规则表：
 
 ```json
-{
-  "narrative_text": "门卫皱着眉打量了你两秒，视线在木箱和你的脸之间来回游移。最终，他不耐烦地挥了挥手，示意你赶紧进去。你踩过潮湿的石板路，进入了庄园外院。厨房方向传来模糊的争吵声，而主屋侧门虚掩着，像是在等谁。",
-  "player_options_hint": [
-    "前往厨房查看",
-    "靠近主屋侧门",
-    "观察周围环境"
-  ],
-  "important_notice": "你已进入庄园外院。"
+ACTION_RULES = {
+    "observe": {"requires_check": False},
+    "stealth_entry": {"requires_check": True, "check": "stealth", "dc": 12},
+    "social_deception": {"requires_check": True, "check": "deception", "dc": 10},
+    "combat_attack": {"requires_check": True, "check": "attack", "dc": 11},
 }
 ```
 
-# 四、固定的类型枚举
+这里先追求复杂，重点是：
 
-### 1. 固定 `action_type` 枚举
+> **规则必须可以被代码检查、调试、复现。**
+> 
 
-v0.0 千万不要让动作类型无限发散。先强行定一个小集合。
+## 5. 状态更新模块
 
-```
-move              移动
-observe           观察
-investigate       调查
-talk              对话
-persuade          说服
-deceive           欺骗/伪装
-stealth           潜行
-take_item         拿取物品
-use_item          使用物品
-attack            攻击
-```
-
-### 2. 固定 `check_type` 枚举
-
-v0.0的检定类型也不要太自由：
-
-```
-strength          力量检定
-agility           敏捷检定
-intelligence      智力检定
-charisma          魅力检定
-none
-```
-
-其中 `none` 表示不需要检定。
+判定完之后，系统要能把结果写回世界。
 
 例如：
 
-- “我看看桌上有什么” → `observe` + `none`
-- “我搜索抽屉里的账本” → `investigate` + `intelligence`
-- “我翻墙进去” → `move` 或 `stealth` + `agility`
-- “我说服门卫放行” → `persuade` + `charisma`
+- 混入成功 → `player.status += disguised_inside`
+- 欺骗失败 → `guard.alert_level += 1`
+- 战斗受伤 → `player.hp -= 3`
+- 拿到钥匙 → `inventory += key`
 
-# 五、模块接口
+v0.1 必须开始把“结果落到状态上”。
 
-## 1. PM Agent
+## 6. 基础叙事生成
 
-### 输入
+这个模块在 v0.1 不需要很强，但必须自然。
 
-- `PlayerAction`
-- 当前 `WorldState`
+输入应该来自：
 
-### 输出
+- 玩家行动
+- 判定结果
+- 状态变化
+- 当前场景
 
-- `ParsedAction`
-- 若需要检定，再生成 `RuleRequest`
-- 若不需要检定，可生成基础 `StateUpdate`
+输出应该是：
 
-### 不允许
+- 描述发生了什么
+- 给玩家反馈结果
+- 告诉玩家局势发生了什么变化
+- 留出下一步行动空间
 
-- 不允许直接改 `WorldState`
-- 不允许直接生成最终叙事
+比如不是单纯说：
 
----
+> 检定失败。
+> 
 
-## 2. Rules Engine
+而是：
 
-### 输入
+> 你把信封往上抬了抬，试图装出一副赶时间的样子。守卫眯起眼打量你，没有立刻放行，反而伸手拦住了门口。“站住，哪家的信使？口令呢？”
+> 
+> 
+> 气氛明显紧张起来了。你感觉再说错一句，对方就会叫来更多人。
+> 
 
-- `RuleRequest`
-- 当前 `WorldState` 中角色属性部分
+这个模块的目标不是华丽，而是**清楚、连贯、可继续玩**。
 
-### 输出
+## 7. 日志 / 调试输出
 
-- `RuleResult`
+这个非常重要，而且很容易被低估。
 
-### 不允许
+v0.1 一定要能看到每轮内部发生了什么，例如：
 
-- 不允许直接写叙事
-- 不允许直接修改完整世界状态
+- 原始玩家输入
+- PM解析结果
+- 规则判定结果
+- 骰子结果
+- 状态更新前后差异
+- 最终叙事
 
----
 
-## 3. World State Manager
+## 8. 固定短模组支持
 
-### 输入
+v0.1 只做一个 **固定的小场景模组：**逃离山匪营地。长度控制在 10~20 分钟。
 
-- 当前 `WorldState`
-- `RuleResult`
-- `ParsedAction`
-- `StateUpdate`
+这个模组需要：
 
-### 输出
+- 一个明确目标
+- 2~4 个关键场景
+- 少量 NPC
+- 至少两三种可行解法
 
-- 更新后的 `WorldState`
+例如：
 
-### 职责
-
-- 应用状态变更
-- 维护 recent history
-- 保证字段合法
-
----
-
-## 4. DM Agent
-
-### 输入
-
-- `NarrativeContext`
-
-### 输出
-
-- `NarrativeResponse`
-
-### 不允许
-
-- 不允许新增关键线索
-- 不允许修改结构化状态
-- 不允许推翻 Rules 结果
-
----
-
-# 六、完整回合示例
-
-## Step 1 - 玩家输入
-
-```json
-{
-  "session_id": "session_001",
-  "turn_id": 1,
-  "raw_input": "我想假装成送货员混进庄园"
-}
-```
-
----
-
-## Step 2 - PM 解析
-
-```json
-{
-  "action_type": "deceive",
-  "intent": "伪装身份骗过守卫进入庄园",
-  "target": "庄园门卫",
-  "method": "假装送货员",
-  "requires_check": true,
-  "check_type": "charisma",
-  "difficulty": 12,
-  "preconditions": ["玩家在庄园门口", "门卫在场"],
-  "on_success": ["进入庄园外院"],
-  "on_failure": ["守卫起疑"]
-}
-```
-
----
-
-## Step 3 - Rules 执行
-
-```json
-{
-  "turn_id": 1,
-  "roll": 15,
-  "modifier": 2,
-  "total": 17,
-  "difficulty": 12,
-  "outcome": "success",
-  "critical": false,
-  "mechanical_effects": [
-    {
-      "type": "location_change",
-      "value": "庄园外院"
-    },
-    {
-      "type": "npc_alert_change",
-      "target": "guard",
-      "delta": -1
-    }
-  ]
-}
-```
-
----
-
-## Step 4 - 状态更新
-
-```json
-{
-  "turn_id": 1,
-  "updates": [
-    {
-      "op": "set",
-      "path": "world.current_location",
-      "value": "庄园外院"
-    },
-    {
-      "op": "add",
-      "path": "world.unlocked_locations",
-      "value": "庄园外院"
-    },
-    {
-      "op": "inc",
-      "path": "npcs.guard.alert_level",
-      "value": -1
-    },
-    {
-      "op": "append",
-      "path": "history.recent_turns",
-      "value": "玩家伪装成送货员，成功进入庄园外院"
-    }
-  ]
-}
-```
-
----
-
-## Step 5 DM 输出
-
-```json
-{
-  "narrative_text": "门卫狐疑地看了你一眼，又低头看了看你手里的木箱。几秒后，他啧了一声，侧身让开了道路。你顺利走进庄园外院，空气里弥漫着潮湿泥土和消毒水混杂的味道。不远处的厨房传来争执声，而主屋侧门半掩着，像是刚有人进去。",
-  "player_options_hint": [
-    "前往厨房",
-    "进入主屋侧门",
-    "观察外院环境"
-  ],
-  "important_notice": "新地点已解锁：庄园外院"
-}
-```
+- 潜行翻墙
+- 贿赂守卫
+- 正面强闯

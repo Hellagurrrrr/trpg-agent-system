@@ -139,5 +139,4 @@ class NarrativeResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     narrative_text: str = Field(description="叙事文本")
-    player_options_hint: List[str] = Field(default_factory=list, description="2~3 条可执行建议")
     important_notice: Optional[str] = Field(default=None, description="规则或进度层面的重要提示")

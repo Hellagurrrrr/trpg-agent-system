@@ -18,13 +18,11 @@ DM_SYSTEM_PROMPT = """
 1. 只输出 JSON，不要输出任何额外解释。
 2. JSON 必须包含以下字段：
    - narrative_text
-   - player_options_hint（字符串数组）
    - important_notice（可无意义的进度提示则填 null）
 3. narrative_text 只描述玩家当前能感知到的内容。
 4. 不要编造未在线索列表或上下文中隐含的关键事实。
 5. 必须尊重 rule_result 的 outcome（success / failure / critical_*），不得推翻。
 6. 语气保持悬疑、简洁、可玩。
-7. player_options_hint 给出 2~3 个合理的下一步建议。
 """
 
 
